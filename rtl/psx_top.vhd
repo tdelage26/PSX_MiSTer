@@ -164,6 +164,7 @@ entity psx_top is
       DisplayOffsetX        : out unsigned( 9 downto 0);
       DisplayOffsetY        : out unsigned( 8 downto 0);
       video_ce              : out std_logic;
+      video_clkdiv          : out unsigned( 3 downto 0);
       video_interlace       : out std_logic;
       video_r               : out std_logic_vector(7 downto 0);
       video_g               : out std_logic_vector(7 downto 0);
@@ -1553,6 +1554,7 @@ begin
       video_DisplayOffsetX => DisplayOffsetX,
       video_DisplayOffsetY => DisplayOffsetY,
       video_ce             => video_ce,
+      video_clkdiv         => video_clkdiv,
       video_interlace      => video_interlace,
       video_r              => video_r, 
       video_g              => video_g, 
@@ -1971,12 +1973,19 @@ begin
       debug_firstGTE       => debug_firstGTE
    );
    
-   ddr3_BURSTCNT <= ss_ram_BURSTCNT     when (ddr3_savestate = '1') else arbiter_BURSTCNT when (arbiter_active = '1') else  vram_BURSTCNT;  
-   ddr3_ADDR     <= ss_ram_ADDR & "00"  when (ddr3_savestate = '1') else arbiter_ADDR     when (arbiter_active = '1') else  vram_ADDR;      
-   ddr3_DIN      <= ss_ram_DIN          when (ddr3_savestate = '1') else arbiter_DIN      when (arbiter_active = '1') else  vram_DIN;       
-   ddr3_BE       <= ss_ram_BE           when (ddr3_savestate = '1') else arbiter_BE       when (arbiter_active = '1') else  vram_BE;        
-   ddr3_WE       <= ss_ram_WE           when (ddr3_savestate = '1') else arbiter_WE       when (arbiter_active = '1') else  vram_WE;        
-   ddr3_RD       <= ss_ram_RD           when (ddr3_savestate = '1') else arbiter_RD       when (arbiter_active = '1') else  vram_RD;        
+--   ddr3_BURSTCNT <= ss_ram_BURSTCNT     when (ddr3_savestate = '1') else arbiter_BURSTCNT when (arbiter_active = '1') else  vram_BURSTCNT;  
+--   ddr3_ADDR     <= ss_ram_ADDR & "00"  when (ddr3_savestate = '1') else arbiter_ADDR     when (arbiter_active = '1') else  vram_ADDR;      
+--   ddr3_DIN      <= ss_ram_DIN          when (ddr3_savestate = '1') else arbiter_DIN      when (arbiter_active = '1') else  vram_DIN;       
+--   ddr3_BE       <= ss_ram_BE           when (ddr3_savestate = '1') else arbiter_BE       when (arbiter_active = '1') else  vram_BE;        
+--   ddr3_WE       <= ss_ram_WE           when (ddr3_savestate = '1') else arbiter_WE       when (arbiter_active = '1') else  vram_WE;        
+--   ddr3_RD       <= ss_ram_RD           when (ddr3_savestate = '1') else arbiter_RD       when (arbiter_active = '1') else  vram_RD;        
+
+   ddr3_BURSTCNT <= arbiter_BURSTCNT when (arbiter_active = '1') else  vram_BURSTCNT;  
+   ddr3_ADDR     <= arbiter_ADDR     when (arbiter_active = '1') else  vram_ADDR;      
+   ddr3_DIN      <= arbiter_DIN      when (arbiter_active = '1') else  vram_DIN;       
+   ddr3_BE       <= arbiter_BE       when (arbiter_active = '1') else  vram_BE;        
+   ddr3_WE       <= arbiter_WE       when (arbiter_active = '1') else  vram_WE;        
+   ddr3_RD       <= arbiter_RD       when (arbiter_active = '1') else  vram_RD;        
    
    memcard_changed <= MemCard_changePending1 or MemCard_changePending2;
    saving_memcard  <= MemCard_saving_memcard1 or MemCard_saving_memcard2;
@@ -1984,6 +1993,7 @@ begin
    imemcard1 : entity work.memcard
    port map
    (
+      clk1x                => clk1x,
       clk2x                => clk2x, 
       ce                   => ce,    
       reset                => reset, 
@@ -2024,6 +2034,7 @@ begin
    imemcard2 : entity work.memcard
    port map
    (
+      clk1x                => clk1x,
       clk2x                => clk2x, 
       ce                   => ce,    
       reset                => reset, 
@@ -2060,7 +2071,7 @@ begin
       memcard_dataIn       => memcard2_dataIn, 
       memcard_dataOut      => memcard2_dataOut
    );
-   
+
    isavestates : entity work.savestates
    generic map
    (

@@ -113,6 +113,7 @@ entity gpu is
       video_DisplayOffsetX : out unsigned( 9 downto 0) := (others => '0'); 
       video_DisplayOffsetY : out unsigned( 8 downto 0) := (others => '0'); 
       video_ce             : out std_logic;
+      video_clkdiv         : out unsigned( 3 downto 0);
       video_interlace      : out std_logic;
       video_r              : out std_logic_vector(7 downto 0);
       video_g              : out std_logic_vector(7 downto 0);
@@ -1958,6 +1959,7 @@ begin
    video_DisplayWidth   <= videoout_out.DisplayWidthReal; 
    video_DisplayHeight  <= videoout_out.DisplayHeightReal;
    video_ce             <= videoout_out.ce;            
+   video_clkdiv         <= videoout_out.clkdiv;
    video_interlace      <= videoout_out.interlace;     
    video_r              <= videoout_out.r;             
    video_g              <= videoout_out.g;             

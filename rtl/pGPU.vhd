@@ -77,6 +77,7 @@ package pGPU is
       DisplayOffsetX    : unsigned( 9 downto 0); 
       DisplayOffsetY    : unsigned( 8 downto 0); 
       ce                : std_logic;
+      clkdiv            : unsigned( 3 downto 0);
       interlace         : std_logic;
       r                 : std_logic_vector(7 downto 0);
       g                 : std_logic_vector(7 downto 0);

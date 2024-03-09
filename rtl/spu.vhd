@@ -489,7 +489,19 @@ architecture arch of spu is
    signal ss_voice_loading    : std_logic := '0';
    
    signal ss_timeout          : unsigned(23 downto 0);
-      
+   
+   subtype word_t is std_logic_vector(15 downto 0);
+
+--   type voiceregs_memory_t is array(0 to 2**8-1) of word_t;
+--   signal VOICEREGS : voiceregs_memory_t;
+
+   type voicevolumes_memory_t is array(0 to 2**6-1) of word_t;
+   signal VOICEVOLUMES : voicevolumes_memory_t;
+
+   subtype voicerecordword_t is std_logic_vector(102 downto 0);
+   type voicerecords_memory_t is array(0 to 2**5-1) of voicerecordword_t;
+   signal VOICERECORDS : voicerecords_memory_t;
+
    -- debug_out
    type outtype is record
       datatype  : integer range 0 to 255;
@@ -579,23 +591,39 @@ begin
  
    gVOICEREGS : for i in 0 to 1 generate
    begin
-      itagramVOICEREGS : entity mem.RamMLAB
-      GENERIC MAP 
+--      itagramVOICEREGS : entity mem.RamMLAB
+--      GENERIC MAP 
+--      (
+--         width         => 16,
+--         widthad       => 8,
+--         width_byteena => 1
+--      )
+--      PORT MAP (
+--         inclock    => clk1x,
+--         wren       => RamVoice_write,
+--         data       => RamVoice_dataA,
+--         wraddress  => std_logic_vector(RamVoice_addrA),
+--         rdaddress  => std_logic_vector(RamVoice_addrB(i)),
+--         q          => RamVoice_dataB(i)
+--      );
+
+      itagramVOICEREGS: entity work.dpram
+      generic map ( addr_width => 8, data_width => 16)
+      port map
       (
-         width         => 16,
-         widthad       => 8,
-         width_byteena => 1
-      )
-      PORT MAP (
-         inclock    => clk1x,
-         wren       => RamVoice_write,
-         data       => RamVoice_dataA,
-         wraddress  => std_logic_vector(RamVoice_addrA),
-         rdaddress  => std_logic_vector(RamVoice_addrB(i)),
-         q          => RamVoice_dataB(i)
+         clock_a     => clk1x,
+         address_a   => std_logic_vector(RamVoice_addrA),
+         data_a      => RamVoice_dataA,
+         wren_a      => RamVoice_write,
+         
+         clock_b     => not clk1x,
+         address_b   => std_logic_vector(RamVoice_addrB(i)),
+         data_b      => (others => '0'),
+         wren_b      => '0',
+         q_b         => RamVoice_dataB(i)
       );
    end generate;
-   
+
    RamVoice_addrB(0) <= bus_addr(8 downto 1);
    
    RamVoice_addrB(1) <= (SS_Adr(7 downto 0) - 64)         when (SS_rden = '1')            else 
@@ -611,25 +639,36 @@ begin
                         
 -- VOICEVOLUMES
  
-   gVOICEVOLUMES : for i in 0 to 1 generate
+--   gVOICEVOLUMES : for i in 0 to 1 generate
+--   begin
+--      itagramVOICEVOLUMES : entity mem.RamMLAB
+--      GENERIC MAP 
+--      (
+--         width         => 16,
+--         widthad       => 6,
+--         width_byteena => 1
+--      )
+--      PORT MAP (
+--         inclock    => clk1x,
+--         wren       => RamVoiceVolumes_write,
+--         data       => RamVoiceVolumes_dataA,
+--         wraddress  => std_logic_vector(RamVoiceVolumes_addrA),
+--         rdaddress  => std_logic_vector(RamVoiceVolumes_addrB(i)),
+--         q          => RamVoiceVolumes_dataB(i)
+--      );
+--   end generate;
+
+   process(clk1x)
    begin
-      itagramVOICEVOLUMES : entity mem.RamMLAB
-      GENERIC MAP 
-      (
-         width         => 16,
-         widthad       => 6,
-         width_byteena => 1
-      )
-      PORT MAP (
-         inclock    => clk1x,
-         wren       => RamVoiceVolumes_write,
-         data       => RamVoiceVolumes_dataA,
-         wraddress  => std_logic_vector(RamVoiceVolumes_addrA),
-         rdaddress  => std_logic_vector(RamVoiceVolumes_addrB(i)),
-         q          => RamVoiceVolumes_dataB(i)
-      );
-   end generate;
-   
+      if (rising_edge(clk1x)) then
+         if (RamVoiceVolumes_write) then
+            VOICEVOLUMES(to_integer(RamVoiceVolumes_addrA)) <= RamVoiceVolumes_dataA;
+         end if;
+      end if;
+   end process;
+   RamVoiceVolumes_dataB(0) <= VOICEVOLUMES(to_integer(RamVoiceVolumes_addrB(0)));
+   RamVoiceVolumes_dataB(1) <= VOICEVOLUMES(to_integer(RamVoiceVolumes_addrB(1)));
+
    RamVoiceVolumes_addrB(0) <= bus_addr(6 downto 1);
    
    RamVoiceVolumes_addrB(1) <= SS_Adr(5 downto 0)                when (SS_rden = '1')            else 
@@ -638,25 +677,36 @@ begin
      
 -- VOICERECORDS
  
-   gVOICERECORDS : for i in 0 to 1 generate
+--   gVOICERECORDS : for i in 0 to 1 generate
+--   begin
+--      itagramVOICECORDS : entity mem.RamMLAB
+--      GENERIC MAP 
+--      (
+--         width         => 103,
+--         widthad       => 5,
+--         width_byteena => 1
+--      )
+--      PORT MAP (
+--         inclock    => clk1x,
+--         wren       => RamVoiceRecord_write,
+--         data       => RamVoiceRecord_dataA,
+--         wraddress  => std_logic_vector(RamVoiceRecord_addrA),
+--         rdaddress  => std_logic_vector(RamVoiceRecord_addrB(i)),
+--         q          => RamVoiceRecord_dataB(i)
+--      );
+--   end generate;
+
+   process(clk1x)
    begin
-      itagramVOICECORDS : entity mem.RamMLAB
-      GENERIC MAP 
-      (
-         width         => 103,
-         widthad       => 5,
-         width_byteena => 1
-      )
-      PORT MAP (
-         inclock    => clk1x,
-         wren       => RamVoiceRecord_write,
-         data       => RamVoiceRecord_dataA,
-         wraddress  => std_logic_vector(RamVoiceRecord_addrA),
-         rdaddress  => std_logic_vector(RamVoiceRecord_addrB(i)),
-         q          => RamVoiceRecord_dataB(i)
-      );
-   end generate;
-   
+      if (rising_edge(clk1x)) then
+         if (RamVoiceRecord_write) then
+            VOICERECORDS(to_integer(RamVoiceRecord_addrA)) <= RamVoiceRecord_dataA;
+         end if;
+      end if;
+   end process;
+   RamVoiceRecord_dataB(0) <= VOICERECORDS(to_integer(RamVoiceRecord_addrB(0)));
+   RamVoiceRecord_dataB(1) <= VOICERECORDS(to_integer(RamVoiceRecord_addrB(1)));
+
    RamVoiceRecord_addrB(0)  <= to_unsigned(index, 5);
    
    RamVoiceRecord_addrB(1)  <= SS_Adr(6 downto 2);
@@ -683,22 +733,38 @@ begin
    
 -- envelopecounters  
  
-   iEnvCounterRam : entity mem.RamMLAB
-   GENERIC MAP 
+--   iEnvCounterRam : entity mem.RamMLAB
+--   GENERIC MAP 
+--   (
+--      width         => 25,
+--      widthad       => 6,
+--      width_byteena => 1
+--   )
+--   PORT MAP (
+--      inclock    => clk1x,
+--      wren       => EnvCounterRam_write,
+--      data       => EnvCounterRam_dataA,
+--      wraddress  => std_logic_vector(EnvCounterRam_addrA),
+--      rdaddress  => std_logic_vector(EnvCounterRam_addrB),
+--      q          => EnvCounterRam_dataB
+--   );
+	 
+   iEnvCounterRam: entity work.dpram
+   generic map ( addr_width => 6, data_width => 25)
+   port map
    (
-      width         => 25,
-      widthad       => 6,
-      width_byteena => 1
-   )
-   PORT MAP (
-      inclock    => clk1x,
-      wren       => EnvCounterRam_write,
-      data       => EnvCounterRam_dataA,
-      wraddress  => std_logic_vector(EnvCounterRam_addrA),
-      rdaddress  => std_logic_vector(EnvCounterRam_addrB),
-      q          => EnvCounterRam_dataB
+      clock_a     => clk1x,
+      address_a   => std_logic_vector(EnvCounterRam_addrA),
+      data_a      => EnvCounterRam_dataA,
+      wren_a      => EnvCounterRam_write,
+         
+      clock_b     => not clk1x,
+      address_b   => std_logic_vector(EnvCounterRam_addrB),
+      data_b      => (others => '0'),
+      wren_b      => '0',
+      q_b         => EnvCounterRam_dataB
    );
-   
+
    EnvCounterRam_addrB <= (SS_Adr(5 downto 0)) when (SS_rden = '1') else to_unsigned(envelopeIndex, 6);
      
 -- savestates

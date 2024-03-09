@@ -5,6 +5,7 @@ use IEEE.numeric_std.all;
 entity memcard is
    port 
    (
+      clk1x                : in  std_logic;
       clk2x                : in  std_logic;
       ce                   : in  std_logic;
       reset                : in  std_logic;
@@ -265,7 +266,7 @@ begin
       wren_a      => mem_wrenA,
       q_a         => mem_DataOutA,
       
-      clock_b     => clk2x,
+      clock_b     => clk1x,
       address_b   => memcard_addr,                    
       data_b      => memcard_dataIn,                  
       wren_b      => (memcard_write and memcard_ack),

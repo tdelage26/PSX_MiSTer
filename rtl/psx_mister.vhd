@@ -160,6 +160,7 @@ entity psx_mister is
       DisplayOffsetX        : out unsigned( 9 downto 0);
       DisplayOffsetY        : out unsigned( 8 downto 0);
       video_ce              : out std_logic;
+      video_clkdiv          : out unsigned( 3 downto 0);
       video_interlace       : out std_logic;
       video_r               : out std_logic_vector(7 downto 0);
       video_g               : out std_logic_vector(7 downto 0);
@@ -450,6 +451,7 @@ begin
       DisplayOffsetX        => DisplayOffsetX,
       DisplayOffsetY        => DisplayOffsetY,
       video_ce              => video_ce,
+      video_clkdiv          => video_clkdiv,
       video_interlace       => video_interlace,
       video_r               => video_r, 
       video_g               => video_g, 

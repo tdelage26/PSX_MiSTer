@@ -595,7 +595,7 @@ begin
    videoout_out.vblank         <= vblankFixed when (videoout_settings.fixedVBlank = '1') else
                                   videoout_reports.inVsync when vDisplayCnt < vDisplayMax else '1';
    
-   
+   videoout_out.clkdiv         <= to_unsigned(clkDiv, 4);
    videoout_out.interlace      <= videoout_settings.GPUSTAT_VerRes and videoout_reports.GPUSTAT_InterlaceField;
 
    videoout_out.DisplayOffsetX <= videoout_settings.vramRange(9 downto 0);

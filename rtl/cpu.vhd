@@ -460,7 +460,16 @@ architecture arch of cpu is
    type tRegs is array(0 to 31) of unsigned(31 downto 0);
    signal regs                         : tRegs := (others => (others => '0'));
 -- synthesis translate_on
-   
+
+   subtype word_t is std_logic_vector(31 downto 0);
+
+   type registers_memory_t is array(0 to 2**5-1) of word_t;
+   signal REGISTERFILE : registers_memory_t;   
+
+   subtype tag_word_t is std_logic_vector(23 downto 0);
+   type tag_memory_t is array(0 to 2**8-1) of tag_word_t;
+	 signal TAGRAM : tag_memory_t;
+
 begin 
 
    -- IO
@@ -526,20 +535,20 @@ begin
 --##############################################################
 --############################### register file
 --##############################################################
-   iregisterfile1 : entity mem.RamMLAB
-	GENERIC MAP 
-   (
-      width                               => 32,
-      widthad                             => 5
-	)
-	PORT MAP (
-      inclock    => clk1x,
-      wren       => regs_wren_a,
-      data       => regs_data_a,
-      wraddress  => regs_address_a,
-      rdaddress  => regs1_address_b,
-      q          => regs1_q_b
-	);
+--   iregisterfile1 : entity mem.RamMLAB
+--	GENERIC MAP 
+--   (
+--      width                               => 32,
+--      widthad                             => 5
+--	)
+--	PORT MAP (
+--      inclock    => clk1x,
+--      wren       => regs_wren_a,
+--      data       => regs_data_a,
+--      wraddress  => regs_address_a,
+--      rdaddress  => regs1_address_b,
+--      q          => regs1_q_b
+--	);
    
    regs_wren_a    <= '1' when (ss_regs_load = '1') else
                      '1' when (lateReadWrite = '1') else
@@ -558,55 +567,91 @@ begin
    regs1_address_b <= std_logic_vector(decSource1);
    regs2_address_b <= std_logic_vector(decSource2);
    
-   iregisterfile2 : entity mem.RamMLAB
-	GENERIC MAP 
-   (
-      width                               => 32,
-      widthad                             => 5
-	)
-	PORT MAP (
-      inclock    => clk1x,
-      wren       => regs_wren_a,
-      data       => regs_data_a,
-      wraddress  => regs_address_a,
-      rdaddress  => regs2_address_b,
-      q          => regs2_q_b
-	);
-   
-   iregisterfileSS : entity mem.RamMLAB
-	GENERIC MAP 
-   (
-      width                               => 32,
-      widthad                             => 5
-	)
-	PORT MAP (
-      inclock    => clk1x,
-      wren       => regs_wren_a,
-      data       => regs_data_a,
-      wraddress  => regs_address_a,
-      rdaddress  => regsSS_address_b,
-      q          => regsSS_q_b
-	);
+--   iregisterfile2 : entity mem.RamMLAB
+--	GENERIC MAP 
+--   (
+--      width                               => 32,
+--      widthad                             => 5
+--	)
+--	PORT MAP (
+--      inclock    => clk1x,
+--      wren       => regs_wren_a,
+--      data       => regs_data_a,
+--      wraddress  => regs_address_a,
+--      rdaddress  => regs2_address_b,
+--      q          => regs2_q_b
+--	);
+--   
+--   iregisterfileSS : entity mem.RamMLAB
+--	GENERIC MAP 
+--   (
+--      width                               => 32,
+--      widthad                             => 5
+--	)
+--	PORT MAP (
+--      inclock    => clk1x,
+--      wren       => regs_wren_a,
+--      data       => regs_data_a,
+--      wraddress  => regs_address_a,
+--      rdaddress  => regsSS_address_b,
+--      q          => regsSS_q_b
+--	);
 
+   process(clk1x)
+   begin
+      if (rising_edge(clk1x)) then
+         if (regs_wren_a) then
+            REGISTERFILE(to_integer(unsigned(regs_address_a))) <= regs_data_a;
+         end if;
+      end if;
+   end process;
+   regs1_q_b  <= REGISTERFILE(to_integer(unsigned(regs1_address_b)));
+   regs2_q_b  <= REGISTERFILE(to_integer(unsigned(regs2_address_b)));
+   regsSS_q_b <= REGISTERFILE(to_integer(unsigned(regsSS_address_b)));
 --##############################################################
 --############################### stage 1
 --##############################################################
 
-   itagram : entity mem.RamMLAB
-   generic map
-   (
-      width      => 24,
-      widthad    => 8
-   )
-   port map
-   (
-      inclock    => clk1x,
-      wren       => tag_wren_a,
-      data       => tag_data_a,
-      wraddress  => tag_address_a,
-      rdaddress  => tag_address_b,
-      q          => tag_q_b
-   );
+--   itagram : entity mem.RamMLAB
+--   generic map
+--   (
+--      width      => 24,
+--      widthad    => 8
+--   )
+--   port map
+--   (
+--      inclock    => clk1x,
+--      wren       => tag_wren_a,
+--      data       => tag_data_a,
+--      wraddress  => tag_address_a,
+--      rdaddress  => tag_address_b,
+--      q          => tag_q_b
+--   );
+   process(clk1x)
+   begin
+      if (rising_edge(clk1x)) then
+         if (tag_wren_a) then
+            TAGRAM(to_integer(unsigned(tag_address_a))) <= tag_data_a;
+         end if;
+      end if;
+   end process;
+   tag_q_b  <= TAGRAM(to_integer(unsigned(tag_address_b)));
+
+--   itagram: entity work.dpram
+--   generic map ( addr_width => 8, data_width => 24)
+--   port map
+--   (
+--      clock_a     => clk1x,
+--      address_a   => tag_address_a,
+--      data_a      => tag_data_a,
+--      wren_a      => tag_wren_a,
+--         
+--      clock_b     => not clk1x,
+--      address_b   => tag_address_b,
+--      data_b      => (others=>'0'),
+--      wren_b      => '0',
+--      q_b         => tag_q_b
+--   );
 
    tag_address_a <= std_logic_vector(writebackInvalidateCacheLine) when (writebackInvalidateCacheEna = '1') else std_logic_vector(FetchLastAddr(11 downto 4));
    

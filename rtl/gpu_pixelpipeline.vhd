@@ -333,21 +333,37 @@ begin
    gfiltermemmult : for i in 0 to 3 generate
    begin
    
-      itagram : entity mem.RamMLAB
-      GENERIC MAP 
+--      itagram : entity mem.RamMLAB
+--      GENERIC MAP 
+--      (
+--         width                               => 10,
+--         widthad                             => 8
+--      )
+--      PORT MAP (
+--         inclock    => clk2x,
+--         wren       => tag_wren_a,
+--         data       => tag_data_a,
+--         wraddress  => std_logic_vector(tag_address_a),
+--         rdaddress  => std_logic_vector(tag_addr(i)),
+--         q          => tag_q_b(i)
+--      );
+
+      itagram: entity work.dpram
+      generic map ( addr_width => 8, data_width => 10)
+      port map
       (
-         width                               => 10,
-         widthad                             => 8
-      )
-      PORT MAP (
-         inclock    => clk2x,
-         wren       => tag_wren_a,
-         data       => tag_data_a,
-         wraddress  => std_logic_vector(tag_address_a),
-         rdaddress  => std_logic_vector(tag_addr(i)),
-         q          => tag_q_b(i)
+         clock_a     => clk2x,
+         address_a   => std_logic_vector(tag_address_a),
+         data_a      => tag_data_a,
+         wren_a      => tag_wren_a,
+         
+         clock_b     => not clk2x,
+         address_b   => std_logic_vector(tag_addr(i)),
+         data_b      => (others => '0'),
+         wren_b      => '0',
+         q_b         => tag_q_b(i)
       );
-      
+
       -- 64x64 pixel for 4bit mode, 32*64 for 8bit mode, 32*32 for 15 bit mode
       tag_addr(i) <= stage0_textaddr(i)(16 downto 11) & stage0_textaddr(i)(4 downto 3) when drawMode(8) = '0' else 
                   stage0_textaddr(i)(15 downto 11) & stage0_textaddr(i)(5 downto 3);

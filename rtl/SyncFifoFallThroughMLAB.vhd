@@ -40,24 +40,38 @@ architecture arch of SyncFifoFallThroughMLAB is
    signal full_wire     : std_logic;
    signal empty_wire    : std_logic;
 
+   subtype word_t is std_logic_vector(DATAWIDTH-1 downto 0);
+
+   type ram_t is array(0 to 2**SIZEBITS-1) of word_t;
+   signal RAM : ram_t;
+
 begin
 
-   iRamMLAB: entity work.RamMLAB
-   generic map
-   (
-      width           => DATAWIDTH,
-      widthad         => SIZEBITS
-   )
-   port map
-   (
-      inclock         => clk,
-      wren            => Wr,
-      data            => Din,
-      wraddress       => std_logic_vector(wrcnt),
-      rdaddress       => std_logic_vector(rdcnt),
-      q               => Dout
-   );
+--   iRamMLAB: entity work.RamMLAB
+--   generic map
+--   (
+--      width           => DATAWIDTH,
+--      widthad         => SIZEBITS
+--   )
+--   port map
+--   (
+--      inclock         => clk,
+--      wren            => Wr,
+--      data            => Din,
+--      wraddress       => std_logic_vector(wrcnt),
+--      rdaddress       => std_logic_vector(rdcnt),
+--      q               => Dout
+--   );
 
+   process(clk)
+   begin
+      if (rising_edge(clk)) then
+         if (wr) then
+            RAM(to_integer(wrcnt)) <= Din;
+         end if;
+      end if;
+   end process;
+   Dout <= RAM(to_integer(rdcnt));
 
    full_wire      <= '1' when fifocnt = (SIZEBITS - 1 downto 0 => '1')  else '0';
    empty_wire     <= '1' when fifocnt = 0                               else '0';
