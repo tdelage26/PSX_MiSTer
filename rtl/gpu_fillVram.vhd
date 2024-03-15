@@ -25,7 +25,8 @@ entity gpu_fillVram is
       pixelStall           : in  std_logic;
       pixelColor           : out std_logic_vector(15 downto 0);
       pixelAddr            : out unsigned(19 downto 0);
-      pixelWrite           : out std_logic
+      pixelWrite           : out std_logic;
+      pixelCount           : out std_logic_vector(7 downto 0)
    );
 end entity;
 
@@ -62,6 +63,7 @@ begin
       variable row     : unsigned(8 downto 0);
       variable col     : unsigned(10 downto 0);
       variable lineEnd : std_logic;
+      variable burst   : unsigned(10 downto 0);
    begin
       if rising_edge(clk2x) then
 
@@ -126,9 +128,16 @@ begin
                         pixelWrite <= '1';
                         pixelAddr  <= row & col(9 downto 0) & '0';
                         pixelColor <= '0' & color;
-                        
-                        if (x + 4 < widt) then
-                           x <= x + 4;
+                        burst := widt - x;
+                        if burst(10) = '1' then
+                          burst := '0'&x"FF"&"00";
+                        end if;
+                        pixelCount <= std_logic_vector(burst(9 downto 2));
+
+                        --if (x + 4 < widt) then
+                           --x <= x + 4;
+                        if (x + burst(9 downto 0) < widt) then
+                           x <= x + burst(9 downto 0);
                         else
                            lineEnd := '1';
                         end if;

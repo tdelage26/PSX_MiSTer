@@ -240,6 +240,7 @@ architecture arch of gpu is
    signal vramFill_pixelColor       : std_logic_vector(15 downto 0);
    signal vramFill_pixelAddr        : unsigned(19 downto 0);
    signal vramFill_pixelWrite       : std_logic;   
+   signal vramFill_pixelCount       : std_logic_vector(7 downto 0);
       
    signal cpu2vram_requestFifo      : std_logic; 
    signal cpu2vram_done             : std_logic; 
@@ -385,11 +386,11 @@ architecture arch of gpu is
       
    -- FIFO OUT 
    signal fifoOut_reset             : std_logic; 
-   signal fifoOut_Din               : std_logic_vector(85 downto 0);
+   signal fifoOut_Din               : std_logic_vector(8+85 downto 0);
    signal fifoOut_Wr                : std_logic; 
    signal fifoOut_Wr_1              : std_logic; 
    signal fifoOut_NearFull          : std_logic;
-   signal fifoOut_Dout              : std_logic_vector(85 downto 0);
+   signal fifoOut_Dout              : std_logic_vector(8+85 downto 0);
    signal fifoOut_Rd                : std_logic;
    signal fifoOut_Empty             : std_logic;
    signal fifoOut_idle              : std_logic;
@@ -1045,7 +1046,8 @@ begin
       pixelStall           => pixelStall,
       pixelColor           => vramFill_pixelColor,
       pixelAddr            => vramFill_pixelAddr, 
-      pixelWrite           => vramFill_pixelWrite
+      pixelWrite           => vramFill_pixelWrite,
+      pixelCount           => vramFill_pixelCount
    );
    
    igpu_cpu2vram : entity work.gpu_cpu2vram
@@ -1478,7 +1480,7 @@ begin
    generic map
    (
       SIZE             => 256,
-      DATAWIDTH        => 64 + 17 + 4 + 1,  -- 64bit data + 17 bit address + 4bit word enable + 1bit source=pipeline
+      DATAWIDTH        => 8 + 64 + 17 + 4 + 1,  -- 7bit burst cnt + 64bit data + 17 bit address + 4bit word enable + 1bit source=pipeline
       NEARFULLDISTANCE => 250
    )
    port map
@@ -1521,7 +1523,7 @@ begin
          fifoOut_Wr_1 <= fifoOut_Wr;
       
          fifoOut_Wr   <= '0';
-         fifoOut_Din  <= pixel64source & pixel64wordEna & pixel64Addr & pixel64data;
+         fifoOut_Din  <= x"01" & pixel64source & pixel64wordEna & pixel64Addr & pixel64data;
          
          fifoOut2_Din <= pixel64data2;
       
@@ -1534,7 +1536,7 @@ begin
             if (vramFill_pixelWrite = '1') then
             
                fifoOut_Wr    <= '1';
-               fifoOut_Din   <=  '1' & "1111" & std_logic_vector(vramFill_pixelAddr(19 downto 3)) & vramFill_pixelColor & vramFill_pixelColor & vramFill_pixelColor & vramFill_pixelColor;
+               fifoOut_Din   <=  vramFill_pixelCount & '1' & "1111" & std_logic_vector(vramFill_pixelAddr(19 downto 3)) & vramFill_pixelColor & vramFill_pixelColor & vramFill_pixelColor & vramFill_pixelColor;
                pixel64filled <= '0';
          
                fifoOut2_Din  <= x"0000000000000000";
@@ -1699,12 +1701,14 @@ begin
                      elsif (fifoOut_Empty = '0') then
                         if (render24 = '1' or interlaced480pHack = '1') then
                            vramState   <= WRITESECOND;
+                           vram_BURSTCNT <= x"01";
+                        else
+                           vram_BURSTCNT <= fifoOut_Dout(93 downto 86);
                         end if;
                         vram_WE         <= '1';
                         vram_ADDR       <= x"00" & fifoOut_Dout(80 downto 64) & "000";
                         vram_BE         <= fifoOut_Dout(84) & fifoOut_Dout(84) & fifoOut_Dout(83) & fifoOut_Dout(83) & fifoOut_Dout(82) & fifoOut_Dout(82) & fifoOut_Dout(81) & fifoOut_Dout(81);
                         vram_DIN        <= fifoOut_Dout(63 downto 0);
-                        vram_BURSTCNT   <= x"01";
                         frameVramType   <= fifoOut_Dout(85);
                         fifoOut2_Dout_1 <= fifoOut2_Dout;
                         if (interlacedDrawing = '1' and interlaced480pHack = '1' and videoout_reports.activeLineLSB = fifoOut_Dout(72) and fifoOut_Dout(85) = '1') then

@@ -170,18 +170,20 @@ reg        port1_done;
 reg        port2_done;
 reg [23:0] port2_ad;
 reg        port2_wr;
+reg  [7:0] port2_bs;
 reg        port2_start_flag, port2_start_flag_d;
 reg        port2_run_flag;
 reg        port2_clr_busy;
 reg [47:0] port2_out;
+reg [63:0] port2_in;
 
 
 reg  [7:0] burstcnt = 0; // 1 burst = 64 bits
-wire       burst_cont = !port2_wr && burstcnt[1:0] != 2'b01 && (port2_ad[9:0] + 4'd8) != 0; // continue burst for max. 4x64bits read
+wire       burst_cont = burstcnt[2:0] != 3'b001 && (port2_ad[9:0] + 4'd8) != 0; // continue burst for max. 4x64bits read/write
 reg        burst_cont_r;
 
 reg        refresh;
-reg [10:0] refresh_cnt;
+reg [12:0] refresh_cnt;
 wire       need_refresh = (refresh_cnt >= RFRSH_CYCLES);
 
 always @(posedge clk) begin
@@ -250,6 +252,8 @@ always @(posedge clk) begin
 				SDRAM_BA <= 0;
 				port1_act <= 1;
 			end
+			else if (!refresh && (!port2_act || port2_wr))
+				t <= STATE_RAS1;
 		end
 
 		if(t == STATE_CAS0) begin
@@ -285,28 +289,32 @@ always @(posedge clk) begin
 		if(t == STATE_RAS1) begin
 			port2_act <= 0;
 			refresh <= 0;
-			port2_start_flag_d <= port2_start_flag;
-			if (port2_start_flag_d ^ port2_start_flag) begin
-				port2_run_flag <= 1;
-				port2_ad <= port2_a;
-				port2_wr <= port2_we;
-				burstcnt <= port2_burstcnt;
-				sd_cmd <= CMD_ACTIVE;
-				SDRAM_A <= port2_a[22:10];
-				SDRAM_BA <= 1;
-				port2_act <= 1;
-				if (!port2_we) port2_clr_busy <= ~port2_clr_busy;
+			if (need_refresh && !port1_act) begin
+				refresh_cnt <= refresh_cnt - RFRSH_CYCLES;
+				sd_cmd <= CMD_AUTO_REFRESH;
+				refresh <= 1;
 			end else if (port2_run_flag) begin
 				sd_cmd <= CMD_ACTIVE;
 				SDRAM_A <= port2_ad[22:10];
 				SDRAM_BA <= 1;
 				port2_act <= 1;
-			end else if (need_refresh && !port1_act) begin
-				refresh_cnt <= refresh_cnt - RFRSH_CYCLES;
-				sd_cmd <= CMD_AUTO_REFRESH;
-				refresh <= 1;
-			end else if (!port1_act)
-				t <= STATE_RAS0;
+			end else begin
+				port2_start_flag_d <= port2_start_flag;
+				if (port2_start_flag_d ^ port2_start_flag) begin
+					port2_run_flag <= 1;
+					port2_ad <= port2_a;
+					port2_wr <= port2_we;
+					burstcnt <= port2_burstcnt;
+					port2_bs <= port2_ds;
+					port2_in <= port2_d;
+					sd_cmd <= CMD_ACTIVE;
+					SDRAM_A <= port2_a[22:10];
+					SDRAM_BA <= 1;
+					port2_act <= 1;
+					port2_clr_busy <= ~port2_clr_busy;
+				end else if (!port1_act)
+					t <= STATE_RAS0;
+			end
 		end
 
 		if(t == STATE_CAS1 || t == STATE_R1) begin
@@ -315,8 +323,8 @@ always @(posedge clk) begin
 				SDRAM_A <= { 4'd0, port2_ad[9:1] };
 				SDRAM_BA <= 1;
 				if (port2_wr) begin
-					SDRAM_DQ <= port2_d[15:0];
-					{ SDRAM_DQMH, SDRAM_DQML } <= ~port2_ds[1:0];
+					SDRAM_DQ <= port2_in[15:0];
+					{ SDRAM_DQMH, SDRAM_DQML } <= ~port2_bs[1:0];
 				end
 			end
 		end
@@ -326,8 +334,8 @@ always @(posedge clk) begin
 				SDRAM_A <= { 4'd0, port2_ad[9:1] + 2'd1 };
 				SDRAM_BA <= 1;
 				if (port2_wr) begin
-					{ SDRAM_DQMH, SDRAM_DQML } <= ~port2_ds[3:2];
-					SDRAM_DQ <= port2_d[31:16];
+					{ SDRAM_DQMH, SDRAM_DQML } <= ~port2_bs[3:2];
+					SDRAM_DQ <= port2_in[31:16];
 				end
 			end
 		end
@@ -337,8 +345,8 @@ always @(posedge clk) begin
 				SDRAM_A <= { 4'd0, port2_ad[9:1] + 2'd2 };
 				SDRAM_BA <= 1;
 				if (port2_wr) begin
-					{ SDRAM_DQMH, SDRAM_DQML } <= ~port2_ds[5:4];
-					SDRAM_DQ <= port2_d[47:32];
+					{ SDRAM_DQMH, SDRAM_DQML } <= ~port2_bs[5:4];
+					SDRAM_DQ <= port2_in[47:32];
 				end
 			end
 		end
@@ -349,10 +357,8 @@ always @(posedge clk) begin
 				SDRAM_A[10] <= !burst_cont_r;
 				SDRAM_BA <= 1;
 				if (port2_wr) begin
-					{ SDRAM_DQMH, SDRAM_DQML } <= ~port2_ds[7:6];
-					SDRAM_DQ <= port2_d[63:48];
-					if (burstcnt == 1)
-						port2_clr_busy <= ~port2_clr_busy;
+					{ SDRAM_DQMH, SDRAM_DQML } <= ~port2_bs[7:6];
+					SDRAM_DQ <= port2_in[63:48];
 				end
 				port2_ad <= port2_ad + 4'd8;
 				burstcnt <= burstcnt - 1'd1;
