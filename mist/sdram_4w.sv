@@ -171,15 +171,15 @@ reg        port2_done;
 reg [23:0] port2_ad;
 reg        port2_wr;
 reg  [7:0] port2_bs;
-reg        port2_start_flag, port2_start_flag_d;
 reg        port2_run_flag;
 reg        port2_clr_busy;
 reg [47:0] port2_out;
 reg [63:0] port2_in;
-
+reg        port2_busy_r;
 
 reg  [7:0] burstcnt = 0; // 1 burst = 64 bits
-wire       burst_cont = burstcnt[2:0] != 3'b001 && (port2_ad[9:0] + 4'd8) != 0; // continue burst for max. 4x64bits read/write
+reg  [1:0] burstcnt2;
+wire       burst_cont = burstcnt[1:0] != 2'b01 && ~&port2_ad[9:3]; // continue burst for max. 4x64bits read/write
 reg        burst_cont_r;
 
 reg        refresh;
@@ -205,6 +205,7 @@ always @(posedge clk) begin
 	endcase
 	
 	burst_cont_r <= burst_cont;
+	port2_busy_r <= port2_busy;
 	
 	// permanently latch ram data to reduce delays
 	sd_din <= SDRAM_DQ;
@@ -298,23 +299,21 @@ always @(posedge clk) begin
 				SDRAM_A <= port2_ad[22:10];
 				SDRAM_BA <= 1;
 				port2_act <= 1;
-			end else begin
-				port2_start_flag_d <= port2_start_flag;
-				if (port2_start_flag_d ^ port2_start_flag) begin
-					port2_run_flag <= 1;
-					port2_ad <= port2_a;
-					port2_wr <= port2_we;
-					burstcnt <= port2_burstcnt;
-					port2_bs <= port2_ds;
-					port2_in <= port2_d;
-					sd_cmd <= CMD_ACTIVE;
-					SDRAM_A <= port2_a[22:10];
-					SDRAM_BA <= 1;
-					port2_act <= 1;
-					port2_clr_busy <= ~port2_clr_busy;
-				end else if (!port1_act)
-					t <= STATE_RAS0;
-			end
+			end else if (port2_busy_r) begin
+				port2_run_flag <= 1;
+				port2_ad <= port2_a;
+				port2_wr <= port2_we;
+				burstcnt <= port2_burstcnt;
+				burstcnt2 <= 2'd3;
+				port2_bs <= port2_ds;
+				port2_in <= port2_d;
+				sd_cmd <= CMD_ACTIVE;
+				SDRAM_A <= port2_a[22:10];
+				SDRAM_BA <= 1;
+				port2_act <= 1;
+				port2_clr_busy <= ~port2_clr_busy;
+			end else if (!port1_act)
+				t <= STATE_RAS0;
 		end
 
 		if(t == STATE_CAS1 || t == STATE_R1) begin
@@ -360,11 +359,26 @@ always @(posedge clk) begin
 					{ SDRAM_DQMH, SDRAM_DQML } <= ~port2_bs[7:6];
 					SDRAM_DQ <= port2_in[63:48];
 				end
+
 				port2_ad <= port2_ad + 4'd8;
 				burstcnt <= burstcnt - 1'd1;
 				if (burstcnt == 1)
 					port2_run_flag <= 0;
 				if (burst_cont_r) t <= STATE_R1;
+
+			end
+		end
+
+		// continue write burst if possible
+		if (t == STATE_CAS1d || t == STATE_R4) begin
+			if (port2_wr && port2_we && port2_burstcnt == 1 && burstcnt == 1 && burstcnt2 != 0 && port2_busy_r && port2_a == {port2_ad[23:10], port2_ad[9:0] + 4'd8}) begin
+				port2_in <= port2_d;
+				port2_bs <= port2_ds;
+				burstcnt <= 1;
+				port2_run_flag <= 1;
+				port2_clr_busy <= ~port2_clr_busy;
+				burstcnt2 <= burstcnt2 - 1'd1;
+				t <= STATE_R1;
 			end
 		end
 
@@ -416,8 +430,6 @@ always @(posedge clk_2x) begin
 
 	else if (port2_req & ~port2_bsy_d) begin
 		port2_bsy <= 1;
-		if (!port2_bsy)
-			port2_start_flag <= ~port2_start_flag;
 	end
 
 	if (port2_clr_busy_old ^ port2_clr_busy)
