@@ -173,7 +173,7 @@ parameter CONF_STR = {
 	"S1C,CUE,Mount CD;",
 	"S2U,SAV,Mount Memcard1;",
 	"S3U,SAV,Mount Memcard2;",
-	"Tm,Save Memcards;",
+	"Tn,Save Memcards;",
 	"F1,EXE;",
 	"OUV,System Type,Auto,NTSC-U,NTSC-J,PAL;",
 	`SEP
@@ -193,8 +193,10 @@ parameter CONF_STR = {
 
 	"P2,Controls;",
 	"P2OG,Joystick Swap,Off,On;",
-	"P2Ojm,Pad1,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,Analog Joystick,Pop'n;",
-	"P2Onq,Pad2,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,Analog Joystick,Pop'n;",
+	"P2OHK,Pad1,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,Analog Joystick,Pop'n;",
+	"P2OLO,Pad2,Dualshock,Off,Digital,Analog,GunCon,NeGcon,Wheel-NegCon,Wheel-Analog,Mouse,Justifier,Analog Joystick,Pop'n;",
+	"P2OP,Show Crosshair,Off,On;",
+	"P2OQR,Multitap,Off,Port1: 4 x Digital,Port1: 4 x Analog;",
 
 	"P3,Miscellaneous;",
 	"P3OW,Fastboot,Off,On;",
@@ -208,7 +210,13 @@ parameter CONF_STR = {
 	"P3Og,Limit Max CD Speed,Off,On(U);",
 	"P3Oh,RAM(Homebrew),2 MByte,8 MByte(U);",
 	"P3Oi,GPU Slowdown,Off,On(U);",
+	"P3",`SEP
+	"P3Oj,FPS Overlay,Off,On;",
+	"P3Ok,Error Overlay,Off,On;",
+	"P3Ol,CD Slow Overlay,Off,On;",
+	"P3Om,CD Overlay,Read,Read+Seek;",
 	`SEP
+	"Oo,Pause,Off,On;",
 	"T0,Reset;",
 	"V,v1.0.",`BUILD_DATE
 };
@@ -228,6 +236,10 @@ wire        st_rotate = status[12];
 wire  [1:0] st_widescreen = status[14:13];
 
 wire        joyswap = status[16];
+wire  [3:0] st_pad1 = status[20:17];
+wire  [3:0] st_pad2 = status[24:21];
+wire        st_showcrosshair = status[25];
+wire  [1:0] st_multitap = status[27:26];
 
 wire        st_fastboot = status[32];
 wire        st_cdlid = status[33];
@@ -239,6 +251,14 @@ wire  [2:0] st_cdspeed = status[41:39];
 wire        st_limitreadspeed = status[42];
 wire        st_ram8 = status[43];
 wire        st_drawslow = status[44];
+
+wire        st_fpsoverlay = status[45];
+wire        st_erroroverlay = status[46];
+wire        st_cdslowoverlay = status[47];
+wire        st_cdoverlay = status[48];
+
+wire        bk_save = status[49];
+wire        st_pause = status[50];
 
 ////////////////////   CLOCKS   ///////////////////
 
@@ -288,7 +308,7 @@ assign SDRAM2_CLK = clk2_3x;
 
 reg reset;
 always @(posedge clk_sys) begin
-	reset <= buttons[1] | status[0] | ioctl_download;
+	reset <= buttons[1] | status[0] | bios_download | exe_download | cdDownloadReset;
 end
 
 //////////////////   MiST I/O   ///////////////////
@@ -508,7 +528,6 @@ reg memcard2_inserted = 0;
 reg [25:0] memcard1_cnt = 0;
 reg [25:0] memcard2_cnt = 0;
 
-wire bk_save     = status[48];
 wire bk_autosave = 0;//~status[71];
 
 reg old_save = 0; 
@@ -528,6 +547,9 @@ reg [31:0] exe_initial_gp;
 reg [31:0] exe_load_address;
 reg [31:0] exe_file_size;   
 reg [31:0] exe_stackpointer;
+
+wire resetFromCD;
+reg  cdDownloadReset = 0;
 
 always @(posedge clk_1x) begin
 	ramdownload_wr <= 0;
@@ -635,12 +657,17 @@ always @(posedge clk_1x) begin
          memcard2_cnt <= memcard2_cnt + 1'd1;
       end
    end
-   
-	old_save   <= bk_save;
-	old_save_a <= bk_save_a;
-   
+
+   old_save   <= bk_save;
+   old_save_a <= bk_save_a;
+
    if ((~old_save & bk_save) | (~old_save_a & bk_save_a)) memcard_save <= 1;
-   
+
+   cdinfo_download_1 <= cdinfo_download;
+	 cdDownloadReset <= 0;
+   if (cdinfo_download_1 && ~cdinfo_download && resetFromCD) begin
+      cdDownloadReset <= 1;
+   end
 end
 
 ////////////////////////////  PAD  ///////////////////////////////////
@@ -658,34 +685,42 @@ end
 // 1010 -> Analog Joystick
 // 1100..1111 -> reserved
 
-wire PadPortDS1      = (status[48:45] == 4'b0000);
-wire PadPortEnable1  = (status[48:45] != 4'b0001);
-wire PadPortDigital1 = (status[48:45] == 4'b0010) || (status[52:49] == 4'b1100);
-wire PadPortAnalog1  = (status[48:45] == 4'b0011) || (status[48:45] == 4'b0111);
-wire PadPortGunCon1  = (status[48:45] == 4'b0100);
-wire PadPortNeGcon1  = (status[48:45] == 4'b0101) || (status[48:45] == 4'b0110);
-wire PadPortWheel1   = (status[48:45] == 4'b0110) || (status[48:45] == 4'b0111);
-wire PadPortMouse1   = (status[48:45] == 4'b1000);
-wire PadPortJustif1  = (status[48:45] == 4'b1001);
-wire PadPortStick1   = (status[48:45] == 4'b1010);
-wire PadPortPopn1    = (status[48:45] == 4'b1100);
+wire PadPortDS1      = (st_pad1 == 4'b0000);
+wire PadPortEnable1  = (st_pad1 != 4'b0001);
+wire PadPortDigital1 = (st_pad1 == 4'b0010) || (st_pad1 == 4'b1100);
+wire PadPortAnalog1  = (st_pad1 == 4'b0011) || (st_pad1 == 4'b0111);
+wire PadPortGunCon1  = (st_pad1 == 4'b0100);
+wire PadPortNeGcon1  = (st_pad1 == 4'b0101) || (st_pad1 == 4'b0110);
+wire PadPortWheel1   = (st_pad1 == 4'b0110) || (st_pad1 == 4'b0111);
+wire PadPortMouse1   = (st_pad1 == 4'b1000);
+wire PadPortJustif1  = (st_pad1 == 4'b1001);
+wire PadPortStick1   = (st_pad1 == 4'b1010);
+wire PadPortPopn1    = (st_pad1 == 4'b1100);
    
-wire PadPortDS2      = (status[52:49] == 4'b0000);
-wire PadPortEnable2  = (status[52:49] != 4'b0001) && ~multitap;
-wire PadPortDigital2 = (status[52:49] == 4'b0010) || (status[52:49] == 4'b1100);
-wire PadPortAnalog2  = (status[52:49] == 4'b0011) || (status[52:49] == 4'b0111);
-wire PadPortGunCon2  = (status[52:49] == 4'b0100);
-wire PadPortNeGcon2  = (status[52:49] == 4'b0101) || (status[52:49] == 4'b0110);
-wire PadPortWheel2   = (status[52:49] == 4'b0110) || (status[52:49] == 4'b0111);
-wire PadPortMouse2   = (status[52:49] == 4'b1000);
-wire PadPortJustif2  = (status[52:49] == 4'b1001);
-wire PadPortStick2   = (status[52:49] == 4'b1010);
-wire PadPortPopn2    = (status[52:49] == 4'b1100);
+wire PadPortDS2      = (st_pad2 == 4'b0000);
+wire PadPortEnable2  = (st_pad2 != 4'b0001) && ~multitap;
+wire PadPortDigital2 = (st_pad2 == 4'b0010) || (st_pad2 == 4'b1100);
+wire PadPortAnalog2  = (st_pad2 == 4'b0011) || (st_pad2 == 4'b0111);
+wire PadPortGunCon2  = (st_pad2 == 4'b0100);
+wire PadPortNeGcon2  = (st_pad2 == 4'b0101) || (st_pad2 == 4'b0110);
+wire PadPortWheel2   = (st_pad2 == 4'b0110) || (st_pad2 == 4'b0111);
+wire PadPortMouse2   = (st_pad2 == 4'b1000);
+wire PadPortJustif2  = (st_pad2 == 4'b1001);
+wire PadPortStick2   = (st_pad2 == 4'b1010);
+wire PadPortPopn2    = (st_pad2 == 4'b1100);
 
 reg paddleMode = 0;
 reg paddleMin = 0;
 reg paddleMax = 0;
 wire [7:0] joy0_xmuxed = /*(paddleMode) ? (paddle_0 - 8'd128) :*/ joystick_analog_0[7:0];
+
+
+// 00 -> multitap off
+// 01 -> port1, 4 x digital
+// 10 -> port1, 4 x analog
+wire multitap        = (st_multitap != 2'b00);
+wire multitapDigital = (st_multitap == 2'b01);
+wire multitapAnalog  = (st_multitap == 2'b10);
 
 ////////////////////////////  SYSTEM  ///////////////////////////////////
 wire [7:0] r,g,b;
@@ -704,8 +739,11 @@ reg TURBO_MEM;
 reg TURBO_COMP;
 reg TURBO_CACHE;
 reg TURBO_CACHE50;
+reg paused;
 
 always @(posedge clk_1x) begin
+   paused <= st_pause;
+
    // 1 => low    -> only MEM
    // 2 => medium -> MEM + 50% cache
    // 3 => high   -> everything
@@ -723,10 +761,10 @@ psx_mister psx
    .clk3x(clk_3x),
    .clkvid(clk_vid),
    .reset(reset),
-   .isPaused(isPaused),
+   .isPaused(),
    // commands 
    .pause(paused),
-   .hps_busy(hps_busy),
+   .hps_busy(1'b0),
    .loadExe(loadExe),
    .exe_initial_pc(exe_initial_pc),
    .exe_initial_gp(exe_initial_gp), 
@@ -746,12 +784,12 @@ psx_mister psx
    .IGNORECDDMATIMING(1'b0),
    .ditherOff(1'b0),
    .interlaced480pHack(hack_480p),
-   .showGunCrosshairs(status9),
-   .fpscountOn(status28),
-   .cdslowOn(1'b0),
-   .testSeek(1'b0),
+   .showGunCrosshairs(st_showcrosshair),
+   .fpscountOn(st_fpsoverlay),
+   .cdslowOn(st_cdslowoverlay),
+   .testSeek(st_cdoverlay),
    .pauseOnCDSlow(~st_pauseoncdslow),
-   .errorOn(1'b0),
+   .errorOn(st_erroroverlay),
    .LBAOn(1'b0),
    .PATCHSERIAL(0), //.PATCHSERIAL(status[54]),
    .noTexture(1'b0),
@@ -768,7 +806,7 @@ psx_mister psx
    .vCrop(hack_480p ? 2'b00 : st_vcrop),
    .hCrop(st_hcrop),
    .SPUon(1'b1),
-   .SPUIRQTrigger(status2),
+   .SPUIRQTrigger(1'b0),
    .SPUSDRAM(1'b1),
    .REVERBOFF(0),
    .REPRODUCIBLESPUDMA(1'b0),
@@ -943,7 +981,7 @@ psx_mister psx
    .RumbleDataP2(joystick2_rumble),
    .RumbleDataP3(joystick3_rumble),
    .RumbleDataP4(joystick4_rumble),
-   .padMode(padMode),
+   .padMode(),
    .MouseEvent(mouse[24]),
    .MouseLeft(mouse[0]),
    .MouseRight(mouse[1]),
