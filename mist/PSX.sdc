@@ -123,8 +123,8 @@ set_multicycle_path -to {VGA_*[*]} -hold 2
 
 #set_multicycle_path -from [get_clocks $sdram_clk] -to [get_clocks $mem_clk] -setup 2
 
-#set_multicycle_path -from [get_clocks $x2_clk] -to {sdram_4w:sdram2|SDRAM_*} -setup 2
-#set_multicycle_path -from [get_clocks $x2_clk] -to {sdram_4w:sdram2|SDRAM_*} -hold 1
+set_multicycle_path -from [get_clocks $x2_clk] -to {sdram_4w:sdram2|*} -setup 2
+set_multicycle_path -from [get_clocks $x2_clk] -to {sdram_4w:sdram2|*} -hold 1
 
 #set_multicycle_path -from {psx_mister:psx|psx_top:ipsx_top|arbiter_active} -to {psx_mister:psx|psx_top:ipsx_top|gpu:igpu|*} -setup 2
 #set_multicycle_path -from {psx_mister:psx|psx_top:ipsx_top|arbiter_active} -to {psx_mister:psx|psx_top:ipsx_top|gpu:igpu|*} -hold 1
