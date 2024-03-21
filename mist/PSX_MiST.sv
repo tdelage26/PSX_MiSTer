@@ -263,7 +263,7 @@ wire        st_pause = status[50];
 ////////////////////   CLOCKS   ///////////////////
 
 wire pll_locked;
-wire clk_3x, clk_2x, clk_1x, clk_vid;
+wire clk_3x, clk_2x, clk_1x, clk_vid, clk_vid_2x;
 assign SDRAM_CLK = clk_3x;
 wire clk_sys = clk_1x;
 
@@ -287,7 +287,8 @@ pll_vid pll_vid
 `else
 	.inclk0(CLOCK_27),
 `endif
-	.c0(clk_vid)
+	.c0(clk_vid),
+	.c1(clk_vid_2x)
 );
 
 assign SDRAM2_CKE = 1;
@@ -724,7 +725,7 @@ wire multitapAnalog  = (st_multitap == 2'b10);
 
 ////////////////////////////  SYSTEM  ///////////////////////////////////
 wire [7:0] r,g,b;
-wire hs, vs, hbl, vbl;
+wire hs, vs, hbl, vbl, video_ce;
 wire [3:0] video_clkdiv;
 wire [15:0] laudio, raudio;
 
@@ -905,7 +906,7 @@ psx_mister psx
    .DisplayHeight   (),
    .DisplayOffsetX  (),
    .DisplayOffsetY  (),
-   .video_ce        (),
+   .video_ce        (video_ce),
    .video_clkdiv    (video_clkdiv),
    .video_interlace (),
    .video_r         (r),
@@ -1247,18 +1248,18 @@ sdram sdram2
 */
 ///////////////////////////// VIDEO /////////////////////////////////////
 
-wire [2:0] ce_divider = (video_clkdiv[0] ? video_clkdiv[2:0] : video_clkdiv[3:1]) - 1'd1;
+wire [2:0] ce_divider_vga = (video_clkdiv == 10) ? 3'd5 : (video_clkdiv - 1'd1);
 
 mist_video #(.SD_HCNT_WIDTH(11), .COLOR_DEPTH(8), .USE_BLANKS(1'b1), .OUT_COLOR_DEPTH(VGA_BITS), .BIG_OSD(BIG_OSD)) mist_video
 (
-	.clk_sys(clk_vid),
+	.clk_sys(clk_vid_2x),
 	.scanlines(scanlines),
 	.scandoubler_disable(scandoubler_disable),
 	.ypbpr(ypbpr),
 	.no_csync(no_csync),
 	.rotate(2'b00),
 	.blend(blend),
-	.ce_divider(ce_divider),
+	.ce_divider(ce_divider_vga),
 	.SPI_DI(SPI_DI),
 	.SPI_SCK(SPI_SCK),
 	.SPI_SS3(SPI_SS3),
@@ -1295,6 +1296,8 @@ i2c_master #(33_000_000) i2c_master (
 	.I2C_SDA     (HDMI_SDA)
 );
 
+wire [2:0] ce_divider_hdmi = (video_clkdiv[0] ? video_clkdiv[2:0] : video_clkdiv[3:1]) - 1'd1;
+
 mist_video #(.SD_HCNT_WIDTH(11), .COLOR_DEPTH(8), .USE_BLANKS(1'b1), .OUT_COLOR_DEPTH(8), .BIG_OSD(BIG_OSD)) hdmi_video
 (
 	.clk_sys(clk_vid),
@@ -1304,7 +1307,7 @@ mist_video #(.SD_HCNT_WIDTH(11), .COLOR_DEPTH(8), .USE_BLANKS(1'b1), .OUT_COLOR_
 	.no_csync(1'b1),
 	.rotate(2'b00),
 	.blend(blend),
-	.ce_divider(ce_divider),
+	.ce_divider(ce_divider_hdmi),
 	.SPI_DI(SPI_DI),
 	.SPI_SCK(SPI_SCK),
 	.SPI_SS3(SPI_SS3),

@@ -58,11 +58,13 @@ set mem_clk   "pll|altpll_component|auto_generated|pll1|clk[0]"
 set x2_clk    "pll|altpll_component|auto_generated|pll1|clk[1]"
 set snd_clk   "pll|altpll_component|auto_generated|pll1|clk[2]"
 set vid_clk   "pll_vid|altpll_component|auto_generated|pll1|clk[0]"
+set vid2x_clk "pll_vid|altpll_component|auto_generated|pll1|clk[0]"
 
 #**************************************************************
 # Create Generated Clock
 #**************************************************************
 
+#create_generated_clock -source reference_pin [-divide_by 1] [-multiply_by 1] source
 
 #**************************************************************
 # Set Clock Latency
@@ -95,7 +97,7 @@ set_output_delay -add_delay   -clock [get_clocks {SPI_SCK}] 1.000 [get_ports {SP
 set_output_delay -add_delay   -clock [get_clocks $snd_clk]  1.000 [get_ports {AUDIO_L}]
 set_output_delay -add_delay   -clock [get_clocks $snd_clk]  1.000 [get_ports {AUDIO_R}]
 set_output_delay -add_delay   -clock [get_clocks $snd_clk]  1.000 [get_ports {LED}]
-set_output_delay -add_delay   -clock [get_clocks $vid_clk]  1.000 [get_ports {VGA_*}]
+set_output_delay -add_delay   -clock [get_clocks $vid2x_clk]  1.000 [get_ports {VGA_*}]
 
 set_output_delay -clock [get_clocks $sdram_clk] -reference_pin [get_ports {SDRAM_CLK}] -max 1.5 [get_ports {SDRAM_D* SDRAM_A* SDRAM_BA* SDRAM_n* SDRAM_CKE}]
 set_output_delay -clock [get_clocks $sdram_clk] -reference_pin [get_ports {SDRAM_CLK}] -min -0.8 [get_ports {SDRAM_D* SDRAM_A* SDRAM_BA* SDRAM_n* SDRAM_CKE}]
@@ -105,8 +107,8 @@ set_output_delay -clock [get_clocks $sdram_clk] -reference_pin [get_ports {SDRAM
 #**************************************************************
 
 set_clock_groups -asynchronous -group [get_clocks {SPI_SCK}] -group [get_clocks {pll|altpll_component|auto_generated|pll1|clk[*]}]
-set_clock_groups -asynchronous -group [get_clocks {SPI_SCK}] -group [get_clocks $vid_clk]
-set_clock_groups -asynchronous -group [get_clocks $vid_clk] -group [get_clocks {pll|altpll_component|auto_generated|pll1|clk[*]}]
+set_clock_groups -asynchronous -group [get_clocks {SPI_SCK}] -group [get_clocks {pll_vid|altpll_component|auto_generated|pll1|clk[*]}]
+set_clock_groups -asynchronous -group [get_clocks {pll_vid|altpll_component|auto_generated|pll1|clk[*]}] -group [get_clocks {pll|altpll_component|auto_generated|pll1|clk[*]}]
 
 #**************************************************************
 # Set False Path
