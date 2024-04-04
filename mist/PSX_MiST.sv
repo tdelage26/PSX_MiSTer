@@ -1,4 +1,5 @@
 //============================================================================
+//============================================================================
 //  PSX top-level for MiST
 //
 //  This program is free software; you can redistribute it and/or modify it
@@ -372,7 +373,7 @@ always @(posedge clk_sys) begin
 	if (mouse_strobe) mouse_strobe_level <= ~mouse_strobe_level;
 end
 
-user_io #(.FEATURES(32'h8000 /* FEAT PSX */| (BIG_OSD << 13) | (HDMI << 14) | (QSPI << 2)), .SD_IMAGES(4), .SD_BLKSZ(1'b1)) user_io
+user_io #(.FEATURES(32'h8000 /* FEAT PSX */| (BIG_OSD << 13) | (HDMI << 14)), .SD_IMAGES(4), .SD_BLKSZ(1'b1)) user_io
 (
 	.clk_sys(clk_sys),
 	.clk_sd(clk_sys),
@@ -710,10 +711,13 @@ wire PadPortJustif2  = (st_pad2 == 4'b1001);
 wire PadPortStick2   = (st_pad2 == 4'b1010);
 wire PadPortPopn2    = (st_pad2 == 4'b1100);
 
+wire [31:0] joystick_ana_0 = joyswap ? joystick_analog_1 : joystick_analog_0;
+wire [31:0] joystick_ana_1 = joyswap ? joystick_analog_0 : joystick_analog_1;
+
 reg paddleMode = 0;
 reg paddleMin = 0;
 reg paddleMax = 0;
-wire [7:0] joy0_xmuxed = /*(paddleMode) ? (paddle_0 - 8'd128) :*/ joystick_analog_0[7:0];
+wire [7:0] joy0_xmuxed = /*(paddleMode) ? (paddle_0 - 8'd128) :*/ joystick_ana_0[15:8];
 
 
 // 00 -> multitap off
@@ -960,15 +964,14 @@ psx_mister psx
    .KeyL3      ({m_fire4[10], m_fire3[10], m_fire2[10], m_fire1[10]}),
 
 //   .ToggleDS   (ToggleDS),
-//   .Analog1XP1(joy0_xmuxed),
-
-   .Analog1YP1(joystick_analog_0[15:8]),
-   .Analog2XP1(joystick_analog_0[31:24]),
-   .Analog2YP1(joystick_analog_0[23:16]),
-   .Analog1XP2(joystick_analog_1[7:0]),
-   .Analog1YP2(joystick_analog_1[15:8]),
-   .Analog2XP2(joystick_analog_1[31:24]),
-   .Analog2YP2(joystick_analog_1[23:16]),
+   .Analog1XP1(joy0_xmuxed),
+   .Analog1YP1(joystick_ana_0[7:0]),
+   .Analog2XP1(joystick_ana_0[31:24]),
+   .Analog2YP1(joystick_ana_0[23:16]),
+   .Analog1XP2(joystick_ana_1[15:8]),
+   .Analog1YP2(joystick_ana_1[7:0]),
+   .Analog2XP2(joystick_ana_1[31:24]),
+   .Analog2YP2(joystick_ana_1[23:16]),
 /*
    .Analog1XP3(joystick_analog_l2[7:0]),
    .Analog1YP3(joystick_analog_l2[15:8]),
