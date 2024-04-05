@@ -440,11 +440,12 @@ reg   [8:0] sd_buff_addr16;
 reg  [15:0] sd_buff_dout16;
 wire        sd_buff_wr16;
 reg         sd_buff_bs;
-reg   [3:0] sd_ack_xd;
 
 always @(posedge clk_sys) begin
-	sd_ack_xd <= sd_ack_x;
-	if (|(~sd_ack_xd & sd_ack_x)) sd_buff_bs <= 0;
+	if (~|sd_ack_x) begin
+		sd_buff_bs <= 0;
+		sd_buff_addr16 <= 0;
+	end
 
 	sd_buff_wr16 <= 0;
 	if (sd_buff_wr) begin
@@ -737,7 +738,7 @@ wire [31:0] sd_lba1, sd_lba2, sd_lba3;
 assign sd_lba = (sd_rd[3] | sd_wr[3]) ? sd_lba3 : (sd_rd[2] | sd_wr[2]) ? sd_lba2 : sd_lba1;
 
 wire [15:0] sd_buff_din16, sd_buff_din2, sd_buff_din3;
-assign sd_buff_din16 = sd_wr[3] ? sd_buff_din3 : sd_buff_din2;
+assign sd_buff_din16 = sd_ack_x[3] ? sd_buff_din3 : sd_buff_din2;
 assign sd_buff_din = sd_buff_addr[0] ? sd_buff_din16[15:8] : sd_buff_din16[7:0];
 
 reg TURBO_MEM;
